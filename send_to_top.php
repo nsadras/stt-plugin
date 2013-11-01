@@ -18,7 +18,7 @@ class Send_To_Top{
         add_action('wp_ajax_stt_update', array($this, 'handle_ajax'));
         //add_filter('posts_join_paged', array($this, 'join'));
 	    //add_filter('posts_where', array($this, 'set_schema'), 10, 2);
-	    add_filter('posts_clauses', array($this, 'set_query'));
+	    add_filter('posts_clauses', array($this, 'set_query'), 10, 2);
         add_filter('stt_get_schemas', array($this, 'set_schemas'));
         // TODO: consolidate posts_orderby, posts_join_paged, and posts_where using posts_clauses
         global $wpdb;
@@ -26,14 +26,13 @@ class Send_To_Top{
     }
 
     public function set_schemas($schemas){
-        $schemas = array('key1' => array('readable' => 'option1'),'key2' => array('readable' => 'option2'),'key3' => array('readable'=>'option3'));
+        $schemas = array('arts' => array('readable' => 'A&E'),'uncategorized' => array('readable' => 'Uncategorized'),'key3' => array('readable'=>'option3'));
         return $schemas;
     }
 
     public function stt_activate() {
         global $wpdb;
         $table_name = $wpdb->prefix . "custom_order";
-        //var_dump($table_name);
         if($wpdb->get_var("SHOW TABLES LIKE '" . $table_name . "'") != $table_name) { // check if table exists
             $sql = "CREATE TABLE $table_name (
                 id int NOT NULL AUTO_INCREMENT,
@@ -63,18 +62,13 @@ class Send_To_Top{
     public function render_form( $post ){
         $pid = $post->ID;
 	$this->schemas = apply_filters('stt_get_schemas', $this->schemas);
-    //$this->schemas = array('key1' => array('readable' => 'option1'),'key2' => array('readable' => 'option2'),'key3' => array('readable'=>'option3'));
 	$keys = array_keys($this->schemas); 
         echo '<select id="stt_dropdown">'; 
 	for($i = 0, $size = count($this->schemas); $i < $size; $i++){
 	    $curr_key = $keys[$i]; // keys are schema slugs
-        echo $curr_key;
+        //echo $curr_key;
   	    echo '<option value ="' . $curr_key . '">' . $this->schemas[$curr_key]['readable'] . '</option>';
 	}
-                //<option value="news-section">Section: News</option>
-                //<option value="opinion-section">Section: Opinion</option>
-            	//<option value="gameday">Post Type: Gameday</option>
-              	//<option value="slides">Post Type: Slide</option>
         echo  '</select>
               <input class="stt_button" type="submit" value="Send to Top"></input>
               <script type="text/javascript">var GLOBAL_post_id = ' . $pid . ';</script>';
@@ -91,14 +85,14 @@ class Send_To_Top{
         $order_scheme = strval($_POST['order_scheme']);
         $timestamp = time();
         //var_dump($order_scheme);
-        $affected = $wpdb->update($this->table_name, array('priority'=>$timestamp,'order_scheme'=>$order_scheme), array('post_id'=>$pid,'order_scheme'=>$order_scheme));
+        $affected = $wpdb->update($this->table_name, array('priority'=>$timestamp), array('post_id'=>$pid,'order_scheme'=>"$order_scheme"));
         if ( $affected == 0 ){
-            trigger_error($wpdb->insert($this->table_name, array('post_id'=>$pid,'order_scheme'=>$order_scheme, 'priority'=>$timestamp)));
+            trigger_error($wpdb->insert($this->table_name, array('post_id'=>$pid,'order_scheme'=>"$order_scheme", 'priority'=>$timestamp)));
         }
-	$num_ordered = $this->schemas["$order_scheme"]['ordered'];
-	$sql = "delete from wp_custom_order where order_scheme=$order_scheme order by priority asc limit (select count(*)-$num_ordered
+	    $num_ordered = $this->schemas["$order_scheme"]['ordered'];
+	    $sql = "delete from wp_custom_order where order_scheme=$order_scheme order by priority asc limit (select count(*)-$num_ordered
  from wp_custom_order)"; // remove all posts that are not in the top $num_ordered from the custom table
-	$wpdb->query($sql);
+	    $wpdb->query($sql);
         die();
     }
     
@@ -137,9 +131,11 @@ class Send_To_Top{
 	// where wp_custom_order.order_scheme = something
     }
 
-    public function set_query($clauses){
-        $clauses['join'] .= ' left outer join wp_custom_order on wp_posts.ID = wp_custom_order.post_id';
+    public function set_query($clauses, $query){
+        $category = $query->get('category_name');
+        $clauses['join'] .= " left outer join (select * from wp_custom_order where order_scheme = \"$category\") wp_custom_order on wp_posts.ID = wp_custom_order.post_id";
         $clauses['orderby'] =  ' wp_custom_order.priority DESC';
+        $clauses['where'] .= " and wp_posts.post_status = 'publish'";
         return $clauses; 
     }
 }
