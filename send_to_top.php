@@ -12,21 +12,75 @@ class Send_To_Top{
  
     public function __construct(){
         register_activation_hook('send_to_top/send_to_top.php' , array('Send_To_Top', 'stt_activate'));
+        add_action('admin_menu', array($this, 'register_menu'));
         add_action('add_meta_boxes', array($this, 'add_ui') );
-        //add_filter('posts_orderby', array($this, 'set_ordering'), 10, 2);
         add_action('admin_enqueue_scripts', array($this, 'stt_scripts'));
         add_action('wp_ajax_stt_update', array($this, 'handle_ajax'));
-        //add_filter('posts_join_paged', array($this, 'join'));
-	    //add_filter('posts_where', array($this, 'set_schema'), 10, 2);
 	    add_filter('posts_clauses', array($this, 'set_query'), 10, 2);
         add_filter('stt_get_schemas', array($this, 'set_schemas'));
-        // TODO: consolidate posts_orderby, posts_join_paged, and posts_where using posts_clauses
         global $wpdb;
         $this->table_name = $wpdb->prefix . "custom_order";
     }
 
+    public function register_menu(){
+        $hook = add_submenu_page('tools.php', 'Send To Top Settings Menu', 'Send To Top', 'publish_posts', 'stt_menu.php', array($this, 'render_menu'));
+        //add_action("admin_print_scripts-$hook", array($this, 'render_menu_assets');
+    }
+
+    public function render_menu(){
+        if (!current_user_can('publish_posts')) {
+            wp_die(__('You do not have sufficient permissions to access this page.'));
+        }
+        if (isset($_POST['_wpnonce'])) {
+            if (!check_admin_referer("stt_menu_form")) { ?>
+                <div class="error"><p>Your session has timed out. Please try again.</p></div><?php
+            } else {
+                $operation = $this->process_action(@$_POST["stt_menu_action"]);
+                if (is_wp_error($operation)) { ?>
+                    <div class="error"><p><strong>An error occurred: <?php echo $operation->get_error_message(); ?></strong></p></div><?php
+                } else { ?>
+                    <div class="updated"><p><strong><?php echo (is_string($operation) ? $operation : 'Finished.'); ?></strong></p></div><?php
+                }
+            }
+        }
+
+        ?>
+
+        <!-- admin page markup -->
+        <h2> Send to Top </h2>
+        <p> Use this page to reset order schemas </p>
+        <form method="post" name="stt_menu_form">
+            <?php wp_nonce_field("stt_menu_form"); ?>    
+            <select name="stt_menu_action" id="stt_menu_dropdown">
+                <?php
+                    $this->schemas = apply_filters('stt_get_schemas', $this->schemas);
+                    $keys = array_keys($this->schemas); 
+                    for($i = 0, $size = count($this->schemas); $i < $size; $i++){
+                        $curr_key = $keys[$i]; // keys are schema slugs
+                        echo '<option value ="' . $curr_key . '">' . $this->schemas[$curr_key]['readable'] . '</option>';
+                    }
+                ?>
+            </select>
+            <input class="stt_button" type="submit" value="Reset Schema"></input>
+        </form>
+        <?php
+
+    }
+
+    public function render_menu_assets(){
+
+    }
+
+    /**
+        Process Admin Panel action
+    **/
+    protected function process_action($action) {
+        global $wpdb;
+        $wpdb->delete($this->table_name,array('order_scheme' => "$action"));
+    }
+
     public function set_schemas($schemas){
-        $schemas = array('arts' => array('readable' => 'A&E'),'uncategorized' => array('readable' => 'Uncategorized'),'key3' => array('readable'=>'option3'));
+        $schemas = array('arts' => array('readable' => 'A&E', 'ordered' => 3),'uncategorized' => array('readable' => 'Uncategorized', 'ordered' => 3),'key3' => array('readable'=>'option3'));
         return $schemas;
     }
 
@@ -61,17 +115,16 @@ class Send_To_Top{
     // print html for form
     public function render_form( $post ){
         $pid = $post->ID;
-	$this->schemas = apply_filters('stt_get_schemas', $this->schemas);
-	$keys = array_keys($this->schemas); 
-        echo '<select id="stt_dropdown">'; 
-	for($i = 0, $size = count($this->schemas); $i < $size; $i++){
-	    $curr_key = $keys[$i]; // keys are schema slugs
-        //echo $curr_key;
-  	    echo '<option value ="' . $curr_key . '">' . $this->schemas[$curr_key]['readable'] . '</option>';
-	}
-        echo  '</select>
-              <input class="stt_button" type="submit" value="Send to Top"></input>
-              <script type="text/javascript">var GLOBAL_post_id = ' . $pid . ';</script>';
+        $this->schemas = apply_filters('stt_get_schemas', $this->schemas);
+        $keys = array_keys($this->schemas); 
+            echo '<select id="stt_dropdown">'; 
+        for($i = 0, $size = count($this->schemas); $i < $size; $i++){
+            $curr_key = $keys[$i]; // keys are schema slugs
+            echo '<option value ="' . $curr_key . '">' . $this->schemas[$curr_key]['readable'] . '</option>';
+        }
+            echo  '</select>
+                  <input class="stt_button" type="submit" value="Send to Top"></input>
+                  <script type="text/javascript">var GLOBAL_post_id = ' . $pid . ';</script>';
     }
 
     // load AJAX js file
@@ -101,27 +154,6 @@ class Send_To_Top{
         return $join_statement;
     }
     public function set_ordering($orderby, $query){
-        /**if ( $query->is_category() ){ //$query->is_home() && $query->is_main_query() ) {
-            $query->set('orderby', 'title');
-            $query->set('order', 'ASC');
-        }
-        switch($query->get('category_name')){
-            case "news":
-                $query->set('orderby','title');
-                break;
-            case "opinion":
-                $query->set('orderby','modified');
-                break;
-            case "uncategorized":
-                $query->set('orderby','#');
-                break;
-            default:
-                $query->set('orderby','title');
-        }
-        $query->set('order','ASC');**/
-        //$query->set('order',' wp_custom_order.priority wp_posts.id DESC');
-        //$query->set('orderby','date');
-
         $orderby = ' wp_custom_order.priority DESC';
         //print_r($query);
         return $orderby;
