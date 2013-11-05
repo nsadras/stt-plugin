@@ -142,11 +142,17 @@ class Send_To_Top{
         if ( $affected == 0 ){
             trigger_error($wpdb->insert($this->table_name, array('post_id'=>$pid,'order_scheme'=>"$order_scheme", 'priority'=>$timestamp)));
         }
+        $this->schemas = apply_filters('stt_get_schemas', $this->schemas);
 	    $num_ordered = $this->schemas["$order_scheme"]['ordered'];
-	    $sql = "delete from wp_custom_order where order_scheme=$order_scheme order by priority asc limit (select count(*)-$num_ordered
- from wp_custom_order)"; // remove all posts that are not in the top $num_ordered from the custom table
-	    $wpdb->query($sql);
-        die();
+	    $curr_count = $wpdb->get_var("select count(*) from $this->table_name where order_scheme='$order_scheme'");
+        $to_delete = $curr_count - $num_ordered;
+        if ( $to_delete < 0){
+            $to_delete = 0;
+        }
+        //$var_dump($to_delete);
+        $sql = "delete from wp_custom_order where order_scheme='$order_scheme' order by priority asc limit $to_delete"; // remove all posts that are not in the top $num_ordered from the custom table
+	    $rows = $wpdb->query($sql);
+        die($rows);
     }
     
     public function join($join_statement){
