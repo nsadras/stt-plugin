@@ -2,7 +2,6 @@
     $(document).ready(function() {
         $("#stt_button").click(function(event){
             event.preventDefault();
-            //alert("button pressed");
             var data = {
                 order_scheme: $("#stt_dropdown").val(), 
                 post_id: GLOBAL_post_id,
