@@ -7,7 +7,7 @@
             $.ajax(ajaxurl, {
                 data: {
                     action: 'stt_update',
-                    order_scheme: $(".js-stt-dropdown").val(), 
+                    order_schema: $(".js-stt-dropdown").val(), 
                     post_id: GLOBAL_post_id,
                     security: GLOBAL_ajax_nonce
                 },
