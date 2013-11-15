@@ -217,7 +217,7 @@ class Send_To_Top{
         }
         
         /**
-         * Remove all posts that are not in the top $num_ordered from the custom table
+         * Remove all posts that are not in the top $ordered from the custom table
          */
         $threshold_priority = $wpdb->get_var($wpdb->prepare(
             "select priority from {$table_name}
@@ -253,6 +253,7 @@ class Send_To_Top{
         }
         return $clauses;
     }
+
 }
 
 
