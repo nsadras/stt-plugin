@@ -240,8 +240,12 @@ class Send_To_Top{
      * Modifies the main query to reorder posts.
      */
     public function set_query($clauses, $query){
+        $schema = $query->get("stt_schema")
+        if (!$schema && $query->is_main_query()) {
+            $schema = static::get_schema();
+        }
+
         global $wpdb;
-        $schema = $this->get_schema();
         if ($schema) {
             $table_name = static::table_name();
             $clauses['join'] .= $wpdb->prepare(" left outer join (select * from " .
