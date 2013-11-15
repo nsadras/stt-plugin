@@ -18,7 +18,6 @@ class Send_To_Top{
         add_action('admin_enqueue_scripts', array($this, 'stt_scripts'));
         add_action('wp_ajax_stt_update', array($this, 'handle_ajax'));
         add_filter('posts_clauses', array($this, 'set_query'), 10, 2);
-        add_filter('stt_get_schemas', array($this, 'set_schemas'));
     }
 
     /**
@@ -202,7 +201,7 @@ class Send_To_Top{
         }
         global $wpdb;
         $pid = intval($_POST['post_id']);
-        $order_schemas = get_schemas();
+        $order_schemas = static::get_schemas();
         $order_schema = $_POST['order_schema'];
         $order_schema_data = $order_schemas[$order_schema];
         $timestamp = time();
@@ -240,7 +239,7 @@ class Send_To_Top{
      * Modifies the main query to reorder posts.
      */
     public function set_query($clauses, $query){
-        $schema = $query->get("stt_schema")
+        $schema = @$query->query_vars["stt_schema"];
         if (!$schema && $query->is_main_query()) {
             $schema = static::get_schema();
         }
@@ -249,10 +248,10 @@ class Send_To_Top{
         if ($schema) {
             $table_name = static::table_name();
             $clauses['join'] .= $wpdb->prepare(" left outer join (select * from " .
-                $table_name . " where order_schema = %s) " . $this->table_name .
-                " on " . $wpdb->prefix . "posts.ID = " . $this->table_name .
+                $table_name . " where order_schema = %s) " . $table_name .
+                " on " . $wpdb->prefix . "posts.ID = " . $table_name .
                 ".post_id", $schema);
-            $clauses['orderby'] =  " {$table_name}.priority DESC ";
+            $clauses['orderby'] =  " {$table_name}.priority DESC, " . @$clauses['orderby'];
             // $clauses['where'] .= " and ". $wpdb->prefix ."posts.post_status = 'publish'";
         }
         return $clauses;
