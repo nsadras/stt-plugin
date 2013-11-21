@@ -88,6 +88,8 @@ class Send_To_Top{
         <form method="post" name="stt_menu_form">
             <?php wp_nonce_field("stt_menu_form"); ?>
             <select name="stt_menu_action" id="stt_menu_dropdown">
+            <option value="NULL" disabled="disabled" selected="selected">Select an option</option>
+            <option value="NULL" disabled="disabled"></option>
                 <?php
                     foreach ($this->get_schemas() as $schema_key => $schema){
                         echo '<option value ="' . esc_attr($schema_key) . '">' . esc_html($schema['readable']) . '</option>';
@@ -137,6 +139,7 @@ class Send_To_Top{
 
             require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
             dbDelta( $sql );
+            update_option('stt_table_version', '1');
         }
     }
 
@@ -157,12 +160,15 @@ class Send_To_Top{
      */
     public function render_form( $post ){
         $pid = $post->ID;
+        echo '<p><strong>Reorder this post to the top of a section.</strong> Pressing the following button will not take you away from this page.</p>';
         echo '<select class="js-stt-dropdown">';
+        echo '<option value="NULL" disabled="disabled" selected="selected">Select an option</option>';
+        echo '<option value="NULL" disabled="disabled"></option>';
         foreach($this->get_schemas() as $schema_key => $schema){
             echo '<option value ="' . $schema_key . '">' . $schema['readable'] . '</option>';
         }
         echo  '</select>
-               <input class="button button-primary js-stt-button" type="submit" value="Send to Top" />
+               <input class="button button-primary js-stt-button" type="submit" value="Send to Top" disabled="disabled" />
                <script type="text/javascript">var GLOBAL_post_id = ' . $pid . '; var GLOBAL_ajax_nonce = "' . wp_create_nonce('stt_update') . '";</script>';
     }
 
@@ -239,9 +245,13 @@ class Send_To_Top{
      * Modifies the main query to reorder posts.
      */
     public function set_query($clauses, $query){
+        $schemas = static::get_schemas();
         $schema = @$query->query_vars["stt_schema"];
         if (!$schema && $query->is_main_query()) {
             $schema = static::get_schema();
+        }
+        if (!array_key_exists($schema, $schemas)) {
+            $schema = null;
         }
 
         global $wpdb;
@@ -252,7 +262,6 @@ class Send_To_Top{
                 " on " . $wpdb->prefix . "posts.ID = " . $table_name .
                 ".post_id", $schema);
             $clauses['orderby'] =  " {$table_name}.priority DESC, " . @$clauses['orderby'];
-            // $clauses['where'] .= " and ". $wpdb->prefix ."posts.post_status = 'publish'";
         }
         return $clauses;
     }

@@ -1,5 +1,9 @@
 (function($){
     $(document).ready(function() {
+        $('.js-stt-dropdown').change(function (){
+            $('.js-stt-button').attr('disabled',
+                $(this).val() == "NULL");
+        });
         $(".js-stt-button").click(function(event){
             event.preventDefault();
             var button_element = $(this);
