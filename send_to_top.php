@@ -133,8 +133,7 @@ class Send_To_Top{
                 priority int NOT NULL,
                 order_schema char(30),
                 post_id bigint(20) unsigned,
-                primary key (id),
-                FOREIGN KEY (post_id) REFERENCES " . $wpdb->posts . "(ID)
+                primary key (id)
             );";
 
             require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
