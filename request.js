@@ -8,11 +8,22 @@
             event.preventDefault();
             var button_element = $(this);
             button_element.attr('disabled', true).val('Sending...');
+            if (GLOBAL_post_id && GLOBAL_post_id != -1) {
+                var post_id = GLOBAL_post_id;
+            } else {
+                var post_id = $(this).parents("tr").attr("id");
+                if (!post_id.match(/^edit-\d+$/)) {
+                    button_element.attr('disabled', true).val('Internal error. (Please notify online team)');
+                    return;
+                } else {
+                    post_id = post_id.substring("edit-".length);
+                }
+            }
             $.ajax(ajaxurl, {
                 data: {
                     action: 'stt_update',
                     order_schema: $(".js-stt-dropdown").val(), 
-                    post_id: GLOBAL_post_id,
+                    post_id: post_id,
                     security: GLOBAL_ajax_nonce
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
@@ -30,6 +41,9 @@
                 },
                 type: 'POST'
             });
+        });
+        $(".editinline").on('click', function(event) {
+            console.log(tag_id);
         });
     });
 })(jQuery);

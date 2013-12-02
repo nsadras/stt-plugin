@@ -6,6 +6,9 @@
 
 class Send_To_Top{
 
+    /** A cache of the re-order data. */
+    private $schemas_by_post_id = null;
+
     /**
      * Registers hooks for this plugin.
      *
@@ -18,6 +21,9 @@ class Send_To_Top{
         add_action('admin_enqueue_scripts', array($this, 'stt_scripts'));
         add_action('wp_ajax_stt_update', array($this, 'handle_ajax'));
         add_filter('posts_clauses', array($this, 'set_query'), 10, 2);
+        add_filter('manage_post_posts_columns', array($this, 'register_column'));
+        add_action('manage_posts_custom_column', array($this, 'retrieve_column'), 10, 2);
+        add_action('quick_edit_custom_box', array($this, 'quick_edit'), 10, 2);
     }
 
     /**
@@ -28,6 +34,52 @@ class Send_To_Top{
     public function table_name() {
         global $wpdb;
         return $wpdb->prefix . "custom_order";
+    }
+
+    /**
+     * Retrieves the list of schemas in which post is ordered.
+     *
+     * @param int $post_id The post ID
+     * @return array Schema list
+     */
+    public function get_schemas_by_post_id($post_id) {
+        global $wpdb;
+        if (is_null($this->schemas_by_post_id)) {
+            $table_name = static::table_name();
+            $order_records = $wpdb->get_results(
+                "SELECT priority, order_schema, post_id FROM {$table_name} ORDER BY priority DESC");
+            $order_records_by_schema = array();
+            foreach ($order_records as $order_record) {
+                $order_schema = $order_record->order_schema;
+                $order_post_id = $order_record->post_id;
+                if (!array_key_exists($order_schema, $order_records_by_schema)) {
+                    $order_records_by_schema[$order_schema] = array();
+                }
+                $order_records_by_schema[$order_schema][] = array(
+                    $order_post_id,
+                    count($order_records_by_schema[$order_schema]),
+                );
+            }
+            $schemas_by_post_id = array();
+            foreach ($order_records_by_schema as $order_schema => $order_record_data) {
+                foreach ($order_record_data as $order_record_datum) {
+                    $order_post_id = $order_record_datum[0];
+                    $order_ranking = $order_record_datum[1] + 1; // 0-index to 1-index
+                    if (!array_key_exists($order_post_id, $schemas_by_post_id)) {
+                        $schemas_by_post_id[$order_post_id] = array();
+                    }
+                    $schemas_by_post_id[$order_post_id][] = array(
+                        'schema' => $order_schema,
+                        'ranking' => $order_ranking,
+                    );
+                }
+            }
+            $this->schemas_by_post_id = $schemas_by_post_id;
+        }
+        if (array_key_exists($post_id, $this->schemas_by_post_id))
+            return $this->schemas_by_post_id[$post_id];
+        else
+            return null;
     }
 
     /**
@@ -56,6 +108,75 @@ class Send_To_Top{
      */
     public function register_menu(){
         $hook = add_submenu_page('tools.php', 'Send To Top Settings Menu', 'Send To Top', 'publish_posts', 'stt_menu.php', array($this, 'render_menu'));
+    }
+
+    /**
+     * Creates the (pseudo) post column
+     *
+     * @return array columns
+     */
+    public function register_column($columns) {
+        $columns['stt-order'] = 'Order';
+        return $columns;
+    }
+
+    /**
+     * Populates the post column value
+     *
+     * @return void
+     */
+    public function retrieve_column($column_name, $id) {
+        if ($column_name == 'stt-order') {
+            $post_order_records = static::get_schemas_by_post_id($id);
+            if ($post_order_records) {
+                $first = true;
+                foreach ($post_order_records as $post_order_record) {
+                    if (!$first) echo '<br />';
+                    $first = false;
+                    $ranking = $post_order_record['ranking'];
+                    $schema = $post_order_record['schema'];
+                    $schemas = $this->get_schemas();
+                    if (array_key_exists($schema, $schemas)) {
+                        $schema = $schemas[$schema]['readable'];
+                    } else {
+                        $schema = "($schema)";
+                    }
+                    echo "#" . $ranking . " on " . $schema;
+                }
+            } else {
+                echo 'None';
+            }
+        }
+    }
+
+    /**
+     * Renders the quick edit menu
+     *
+     * @internal NOTE the -1 below is a signal to the JavaScript that the ID should be auto-populated
+     * @return void
+     */
+    public function quick_edit($column_name, $post_type) {
+        if ($column_name == 'stt-order') { ?>
+            <fieldset class="inline-edit-col-right">
+                <div class="inline-edit-col">
+                <span class="title">Reorder</span>
+                <select class="js-stt-dropdown">
+                <option value="NULL" disabled="disabled" selected="selected">Select an option</option>
+                <option value="NULL" disabled="disabled"></option>
+                <?php
+                    foreach($this->get_schemas() as $schema_key => $schema){
+                        echo '<option value ="' . $schema_key . '">' . $schema['readable'] . '</option>';
+                    }
+                ?>
+                </select>
+                <input class="button button-primary js-stt-button" type="submit" value="Send to Top" disabled="disabled" />
+                <script type="text/javascript">var GLOBAL_post_id = -1; <?php
+                    /* See internal note in function comment about post_id */
+                    ?> var GLOBAL_ajax_nonce = "<?php echo wp_create_nonce('stt_update'); ?>";</script>
+                </div>
+            </fieldset>
+        <?php
+        }
     }
 
     /**
