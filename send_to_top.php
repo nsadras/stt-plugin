@@ -299,7 +299,7 @@ class Send_To_Top{
      * @return void
      */
     public function stt_scripts(){
-        wp_enqueue_script('stt-ajax-request', plugins_url() . '/send_to_top/request.js?version=2');
+        wp_enqueue_script('stt-ajax-request', plugins_url() . '/send_to_top/request.js', array(), '2');
     }
 
     /**
