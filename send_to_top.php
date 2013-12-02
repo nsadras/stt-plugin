@@ -22,6 +22,7 @@ class Send_To_Top{
         add_action('wp_ajax_stt_update', array($this, 'handle_ajax'));
         add_filter('posts_clauses', array($this, 'set_query'), 10, 2);
         add_filter('manage_post_posts_columns', array($this, 'register_column'));
+        add_filter('manage_slide_posts_columns', array($this, 'register_column'), 2000, 1);
         add_action('manage_posts_custom_column', array($this, 'retrieve_column'), 10, 2);
         add_action('quick_edit_custom_box', array($this, 'quick_edit'), 10, 2);
     }
